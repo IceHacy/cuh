@@ -5,21 +5,40 @@ on: [push, workflow_dispatch]
 jobs:
   build:
 
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
 
     steps:
-    - name: Download
-      run: Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip -OutFile ngrok.zip
-    - name: Extract
-      run: Expand-Archive ngrok.zip
-    - name: Auth
-      run: .\ngrok\ngrok.exe authtoken $Env:NGROK_AUTH_TOKEN
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y qemu qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils virt-manager x11vnc xvfb wget unzip
+    - name: Download Arch Linux ISO
+      run: wget https://mirror.rackspace.com/archlinux/iso/latest/archlinux-x86_64.iso -O archlinux.iso
+    - name: Create Disk Image
+      run: qemu-img create -f qcow2 archlinux.img 20G
+    - name: Download ngrok
+      run: wget https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.zip -O ngrok.zip
+    - name: Extract ngrok
+      run: unzip ngrok.zip
+    - name: Start VNC Server
+      run: |
+        Xvfb :1 -screen 0 1024x768x16 &
+        x11vnc -display :1 -N -forever -shared -rfbport 5900 &
+    - name: Run Arch Linux Installer
+      run: |
+        sudo qemu-system-x86_64 \
+          -m 2G \
+          -cdrom archlinux.iso \
+          -drive file=archlinux.img,format=qcow2 \
+          -boot d \
+          -enable-kvm \
+          -net nic \
+          -net user \
+          -vnc :1 \
+          -no-reboot &
+    - name: Start ngrok
+      run: ./ngrok tcp 5900 --log=stdout
       env:
         NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
-    - name: Enable TS
-      run: Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server'-name "fDenyTSConnections" -Value 0
-    - run: Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
-    - run: Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -Value 1
-    - run: Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "P@ssw0rd!" -Force)
-    - name: Create Tunnel
-      run: .\ngrok\ngrok.exe tcp 3389
+    - name: Keep Alive
+      run: sleep 6h
