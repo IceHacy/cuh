@@ -11,13 +11,9 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y xfce4 xfce4-goodies xrdp pulseaudio pulseaudio-module-xrdp alsa-utils ubuntu-drivers-common
-
-    - name: Install graphics drivers
-      run: |
-        sudo ubuntu-drivers autoinstall
-        sudo reboot
-
+        sudo apt-get install -y xfce4 xfce4-goodies pulseaudio pulseaudio-utils alsa-utils dbus-x11
+        sudo apt-get install -y wget unzip
+    
     - name: Download ngrok
       run: wget https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.zip -O ngrok.zip
     
@@ -29,11 +25,8 @@ jobs:
       env:
         NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
 
-    - name: Setup xfce4 session for xrdp
-      run: echo "startxfce4" > ~/.xsession
-
-    - name: Start xrdp service
-      run: sudo systemctl enable xrdp && sudo systemctl start xrdp
+    - name: Start PulseAudio
+      run: pulseaudio --start
     
     - name: Create Tunnel
-      run: ./ngrok tcp 3389
+      run: ./ngrok tcp 5901
