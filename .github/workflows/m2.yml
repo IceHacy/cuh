@@ -1,32 +1,66 @@
-name: CI
+name: Ubuntu RDP
 
-on: [push, workflow_dispatch]
+on:
+  workflow_dispatch:
+    inputs:
+      hostname:
+        description: 'Enter Hostname:'
+        required: false
+        default: ubuntu
+        type: string
+      username:
+        description: 'Enter Username:'
+        required: false
+        default: user
+        type: string
+      password:
+        description: 'Enter Password:'
+        required: false
+        default: root
+        type: string
+      Pin:
+        description: 'Enter a Pin (more or equal to 6 digits)'
+        required: false
+        default: 123456
+        type: number
+      CRP:
+        description: 'Visit at http://remotedesktop.google.com/headless and, copy a command after authentication'
+        required: false
+        type: string
+
+env:
+  hostname: ${{ inputs.hostname }}
+  username: ${{ inputs.username }}
+  password: ${{ inputs.password }}
+  Pin: ${{ inputs.Pin }}
+  CRP: ${{ inputs.CRP }}
 
 jobs:
   build:
-
+    name: Deploy Server
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
 
     steps:
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y xfce4 xfce4-goodies pulseaudio pulseaudio-utils alsa-utils dbus-x11
-        sudo apt-get install -y wget unzip
-    
-    - name: Download ngrok
-      run: wget https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.zip -O ngrok.zip
-    
-    - name: Extract ngrok
-      run: unzip ngrok.zip
-    
-    - name: Authenticate ngrok
-      run: ./ngrok authtoken $NGROK_AUTH_TOKEN
-      env:
-        NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+      - name: Cleanup Junk
+        run: |
+          curl -sL -o Cleanup.sh \
+              https://raw.githubusercontent.com/Diwash0007/Ubuntu_RDP/main/Cleanup.sh
+          chmod +x Cleanup.sh
+          ./Cleanup.sh
 
-    - name: Start PulseAudio
-      run: pulseaudio --start
-    
-    - name: Create Tunnel
-      run: ./ngrok tcp 5901
+      - name: Create Server
+        run: |
+          curl -sL -o Ubuntu_RDP.sh \
+              https://raw.githubusercontent.com/Diwash0007/Ubuntu_RDP/main/Ubuntu_RDP.sh
+          chmod +x Ubuntu_RDP.sh
+          ./Ubuntu_RDP.sh
+      
+      - name: Keep Running
+        run: |
+          curl -sL -o Keep_Running.sh \
+              https://raw.githubusercontent.com/Diwash0007/Ubuntu_RDP/main/Keep_Running.sh
+          chmod +x Keep_Running.sh
+          ./Keep_Running.sh
