@@ -37,7 +37,10 @@ jobs:
     - name: Install Chromium
       run: |
         sudo apt-get install -y chromium-browser
-        sudo ln -s /usr/lib/chromium-browser/chromium-browser /usr/bin/chromium
+        # Check if /usr/bin/chromium exists, if not, create the symlink
+        if [ ! -f /usr/bin/chromium ]; then
+          sudo ln -sf /usr/lib/chromium-browser/chromium-browser /usr/bin/chromium
+        fi
 
     - name: Install OBS Studio
       run: |
