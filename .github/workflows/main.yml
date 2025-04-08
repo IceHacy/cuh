@@ -1,35 +1,52 @@
 name: CI
 
-on: [push, workflow_dispatch]
+on:
+  workflow_dispatch:
+    inputs:
+      chrome_rd_auth_code:
+        description: 'Chrome Remote Desktop Auth Code'
+        required: true
+      chrome_rd_pin:
+        description: 'Chrome Remote Desktop PIN'
+        required: true
 
 jobs:
   build:
     runs-on: windows-latest
 
     steps:
-    - name: Download
-      run: Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip -OutFile ngrok.zip
-    - name: Extract
-      run: Expand-Archive ngrok.zip
-    - name: Auth
-      run: .\ngrok\ngrok.exe authtoken $Env:NGROK_AUTH_TOKEN
-      env:
-        NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
-    - name: Enable TS
-      run: Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -Value 0
-    - run: Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
-    - run: Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -Value 0
-    - run: Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "P@ssw0rd!" -Force)
-    - name: Download Notepad++
-      run: Invoke-WebRequest https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/v8.4.9/npp.8.4.9.Installer.x64.exe -OutFile notepad++.exe
-    - name: Install Notepad++
-      run: .\notepad++.exe /S
-    - name: Set Explorer Icons
+    - name: Install Chrome
       run: |
-        Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "IconsOnly" -Value 1
-        Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "ShowHidden" -Value 1
-    - name: Set Dark Theme
+        Invoke-WebRequest -Uri "http://dl.google.com/chrome/install/375.126/chrome_installer.exe" -OutFile "chrome_installer.exe"
+        .\chrome_installer.exe /silent /install
+      shell: powershell
+
+    - name: Download Chrome Remote Desktop Host
       run: |
-        Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "AppsUseLightTheme" -Value 0
-    - name: Create Tunnel
-      run: .\ngrok\ngrok.exe tcp 3389
+        Invoke-WebRequest -Uri "https://dl.google.com/chrome-remote-desktop/chromeremotedesktophost.msi" -OutFile "chromeremotedesktophost.msi"
+      shell: powershell
+
+    - name: Install Chrome Remote Desktop Host
+      run: |
+        msiexec /i chromeremotedesktophost.msi /quiet /norestart
+      shell: powershell
+
+    - name: Configure Chrome Remote Desktop
+      run: |
+        $authCode = "${{ github.event.inputs.chrome_rd_auth_code }}"
+        $pin = "${{ github.event.inputs.chrome_rd_pin }}"
+        Start-Process -FilePath "C:\Program Files (x86)\Google\Chrome Remote Desktop\CurrentVersion\host.exe" -ArgumentList "--code=`"$authCode`" --pin=`"$pin`" --name=`"GitHubRunner`"" -Wait -NoNewWindow
+      shell: powershell
+
+    - name: Ensure Windows Audio Services are Running
+      run: |
+        Set-Service -Name "Audiosrv" -StartupType Automatic
+        Start-Service -Name "Audiosrv"
+        Set-Service -Name "AudioEndpointBuilder" -StartupType Automatic
+        Start-Service -Name "AudioEndpointBuilder"
+      shell: powershell
+
+    - name: Keep Workflow Alive for Access
+      run: |
+        Start-Sleep -Seconds 1800
+      shell: powershell
