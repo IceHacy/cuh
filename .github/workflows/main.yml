@@ -15,15 +15,9 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - name: Install Chrome
-      run: |
-        Invoke-WebRequest -Uri "http://dl.google.com/chrome/install/375.126/chrome_installer.exe" -OutFile "chrome_installer.exe"
-        .\chrome_installer.exe /silent /install
-      shell: powershell
-
     - name: Download Chrome Remote Desktop Host
       run: |
-        Invoke-WebRequest -Uri "https://dl.google.com/chrome-remote-desktop/chromeremotedesktophost.msi" -OutFile "chromeremotedesktophost.msi"
+        Invoke-WebRequest -Uri "https://dl.google.com/edgedl/chrome-remote-desktop/chromeremotedesktophost.msi" -OutFile "chromeremotedesktophost.msi"
       shell: powershell
 
     - name: Install Chrome Remote Desktop Host
