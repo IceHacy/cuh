@@ -28,8 +28,7 @@ jobs:
     - name: Configure Chrome Remote Desktop
       run: |
         $authCode = "${{ github.event.inputs.chrome_rd_auth_code }}"
-        $pin = "${{ github.event.inputs.chrome_rd_pin }}"
-        Start-Process -FilePath "C:\Program Files (x86)\Google\Chrome Remote Desktop\CurrentVersion\host.exe" -ArgumentList "--code=`"$authCode`" --pin=`"$pin`" --name=`"GitHubRunner`"" -Wait -NoNewWindow
+        cmd.exe /c ""%PROGRAMFILES(X86)%\Google\Chrome Remote Desktop\CurrentVersion\remoting_start_host.exe" --code="$authCode" --redirect-url="https://remotedesktop.google.com/_/oauthredirect" --name=%COMPUTERNAME%"
       shell: powershell
 
     - name: Ensure Windows Audio Services are Running
@@ -40,7 +39,7 @@ jobs:
         Start-Service -Name "AudioEndpointBuilder"
       shell: powershell
 
-    - name: Keep Workflow Alive for Access
+    - name: ok
       run: |
-        Start-Sleep -Seconds 1800
+        Start-Sleep -Seconds 999999
       shell: powershell
