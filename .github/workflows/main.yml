@@ -6,9 +6,6 @@ on:
       chrome_rd_auth_code:
         description: 'Chrome Remote Desktop Auth Code'
         required: true
-      chrome_rd_pin:
-        description: 'Chrome Remote Desktop PIN'
-        required: true
 
 jobs:
   build:
@@ -28,7 +25,7 @@ jobs:
     - name: Configure Chrome Remote Desktop
       run: |
         $authCode = "${{ github.event.inputs.chrome_rd_auth_code }}"
-        cmd.exe /c ""%PROGRAMFILES(X86)%\Google\Chrome Remote Desktop\CurrentVersion\remoting_start_host.exe" --code="$authCode" --redirect-url="https://remotedesktop.google.com/_/oauthredirect" --name=%COMPUTERNAME%"
+        cmd.exe /c "`"$env:ProgramFilesX86\Google\Chrome Remote Desktop\CurrentVersion\remoting_start_host.exe`" --code=`"$authCode`" --redirect-url=`"https://remotedesktop.google.com/_/oauthredirect`" --name=`"%COMPUTERNAME%`""
       shell: powershell
 
     - name: Ensure Windows Audio Services are Running
@@ -39,7 +36,12 @@ jobs:
         Start-Service -Name "AudioEndpointBuilder"
       shell: powershell
 
-    - name: ok
+    - name: Set Runner Admin Password
       run: |
-        Start-Sleep -Seconds 999999
+        Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "P@ssw0rd!" -Force)
+      shell: powershell
+
+    - name: Keep Workflow Alive for Access
+      run: |
+        Start-Sleep -Seconds 21600
       shell: powershell
