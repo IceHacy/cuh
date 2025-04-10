@@ -25,7 +25,7 @@ jobs:
     - name: Configure Chrome Remote Desktop
       run: |
         $authCode = "${{ github.event.inputs.chrome_rd_auth_code }}"
-        cmd.exe /c "`"$env:ProgramFilesX86\Google\Chrome Remote Desktop\CurrentVersion\remoting_start_host.exe`" --code=`"$authCode`" --redirect-url=`"https://remotedesktop.google.com/_/oauthredirect`" --name=`"%COMPUTERNAME%`""
+        cmd.exe /c "`"$env:ProgramFilesX86\Google\Chrome Remote Desktop\CurrentVersion\remoting_start_host.exe`" --code=`"$authCode`" --redirect-url=`"https://remotedesktop.google.com/_/oauthredirect`" --name=`"$env:COMPUTERNAME`""
       shell: powershell
 
     - name: Ensure Windows Audio Services are Running
