@@ -42,7 +42,7 @@ jobs:
       run: |
         try {
           $authCode = "${{ github.event.inputs.chrome_rd_auth_code }}"
-          & "${Env:PROGRAMFILES(X86)}\Google\Chrome Remote Desktop\CurrentVersion\remoting_start_host.exe" --code="$authCode" --redirect-url="https://remotedesktop.google.com/_/oauthredirect" --name=$Env:COMPUTERNAME
+          & "${Env:PROGRAMFILES(X86)}\Google\Chrome Remote Desktop\CurrentVersion\remoting_start_host.exe" --code="$authCode" --redirect-url="https://remotedesktop.google.com/_/oauthredirect" --name=$Env:COMPUTERNAME --pin="123123"
         } catch {
           exit 0
         }
@@ -62,14 +62,6 @@ jobs:
         }
       shell: powershell
 
-    - name: Maintain Connection
-      run: |
-        try {
-          $timer = [System.Diagnostics.Stopwatch]::StartNew()
-          while ($timer.Elapsed.TotalHours -lt 6) {
-            Start-Sleep -Seconds 300
-          }
-        } catch {
-          exit 0
-        }
+    - name: Keep Alive
+      run: Start-Sleep -Seconds 21600
       shell: powershell
