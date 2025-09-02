@@ -5,15 +5,23 @@ on:
 
 jobs:
   new:
-    runs-on: windows-2022
+    runs-on: windows-latest
     
     steps:
-    - name: Set up RDP User and Enable Connections
+    - name: Set up RDP User and Environment
       run: |
         $password = "runnerad3min$"
         $securePassword = ConvertTo-SecureString -String $password -AsPlainText -Force
         Set-LocalUser -Name "runneradmin" -Password $securePassword
+        
+        # Enable RDP
         Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -Value 0
+        
+        # Force a virtual display resolution for the RDP session
+        Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "DesktopWidth"  -Value 1920
+        Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "DesktopHeight" -Value 1080
+        
+        # Open firewall port for RDP
         Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
       shell: pwsh
 
