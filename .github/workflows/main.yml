@@ -10,58 +10,54 @@ on:
 jobs:
   build:
     runs-on: windows-latest
-    env:
-      ACTIONS_STEP_DEBUG: false
-      
-    steps:
-    - name: Configure PowerShell
-      run: |
-        $ErrorActionPreference = 'SilentlyContinue'
-        $ProgressPreference = 'SilentlyContinue'
-      shell: powershell
 
+    steps:
     - name: Download Chrome Remote Desktop Host
       run: |
-        try {
-          Invoke-WebRequest -Uri "https://dl.google.com/edgedl/chrome-remote-desktop/chromeremotedesktophost.msi" -OutFile "$env:TEMP\chromeremotedesktophost.msi" -UseBasicParsing
-        } catch {
-          exit 0
-        }
-      shell: powershell
+        Invoke-WebRequest -Uri "https://dl.google.com/edgedl/chrome-remote-desktop/chromeremotedesktophost.msi" -OutFile "$env:TEMP\chromeremotedesktophost.msi"
+      shell: pwsh
 
     - name: Install Chrome Remote Desktop Host
+      # We use Start-Process with -Wait to ensure the installation is complete before continuing.
       run: |
-        try {
-          Start-Process msiexec.exe -ArgumentList "/i `"$env:TEMP\chromeremotedesktophost.msi`" /quiet /norestart" -Wait -NoNewWindow
-        } catch {
-          exit 0
-        }
-      shell: powershell
+        Start-Process msiexec.exe -ArgumentList '/i "$env:TEMP\chromeremotedesktophost.msi" /quiet /norestart' -Wait
+      shell: pwsh
 
-    - name: Configure Chrome Remote Desktop
+    - name: Configure and Start Chrome Remote Desktop Host
       run: |
-        try {
-          $authCode = "${{ github.event.inputs.chrome_rd_auth_code }}"
-          & "${Env:PROGRAMFILES(X86)}\Google\Chrome Remote Desktop\CurrentVersion\remoting_start_host.exe" --code="$authCode" --redirect-url="https://remotedesktop.google.com/_/oauthredirect" --name=$Env:COMPUTERNAME --pin="123123"
-        } catch {
-          exit 0
-        }
-      shell: powershell
+        $authCode = "${{ github.event.inputs.chrome_rd_auth_code }}"
+        $pin = "123123"
+        $hostExe = "${Env:PROGRAMFILES(X86)}\Google\Chrome Remote Desktop\CurrentVersion\remoting_start_host.exe"
+        
+        $arguments = @(
+          "--code=$authCode",
+          "--redirect-url=https://remotedesktop.google.com/_/oauthredirect",
+          "--name=$Env:COMPUTERNAME"
+        )
 
-    - name: Configure System
+        # For non-interactive setup, the PIN must be piped to the command's standard input.
+        # This command will now correctly fail if it cannot get the required permissions.
+        # We also capture the output to help with debugging.
+        $process = Start-Process -FilePath $hostExe -ArgumentList $arguments -Wait -PassThru -NoNewWindow -RedirectStandardInput ([System.IO.MemoryStream]::new([System.Text.Encoding]::UTF8.GetBytes($pin)))
+        
+        # Explicitly check the exit code and fail the workflow if it's not zero.
+        if ($process.ExitCode -ne 0) {
+            Write-Error "Chrome Remote Desktop host setup failed with exit code: $($process.ExitCode)"
+            exit $process.ExitCode
+        }
+      shell: pwsh
+
+    - name: Enable Audio Services
+      # It's good practice to ensure required services are running.
       run: |
-        try {
-          Set-Service -Name "Audiosrv" -StartupType Automatic -ErrorAction SilentlyContinue
-          Start-Service -Name "Audiosrv" -ErrorAction SilentlyContinue
-          Set-Service -Name "AudioEndpointBuilder" -StartupType Automatic -ErrorAction SilentlyContinue
-          Start-Service -Name "AudioEndpointBuilder" -ErrorAction SilentlyContinue
-          $SecurePass = ConvertTo-SecureString -String "P@ssw0rd!" -AsPlainText -Force
-          Set-LocalUser -Name "runneradmin" -Password $SecurePass -ErrorAction SilentlyContinue
-        } catch {
-          exit 0
-        }
-      shell: powershell
+        Set-Service -Name "Audiosrv" -StartupType Automatic
+        Start-Service -Name "Audiosrv"
+        Set-Service -Name "AudioEndpointBuilder" -StartupType Automatic
+        Start-Service -Name "AudioEndpointBuilder"
+      shell: pwsh
 
-    - name: Keep Alive
-      run: Start-Sleep -Seconds 21600
-      shell: powershell
+    - name: Keep Runner Alive
+      # This step remains to keep the session open for connection.
+      run: |
+        Start-Sleep -Seconds 21600
+      shell: pwsh
