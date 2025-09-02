@@ -1,10 +1,10 @@
-name: RDP via ngrok
+name: New
 
 on:
   workflow_dispatch:
 
 jobs:
-  rdp:
+  new:
     runs-on: windows-latest
     
     steps:
@@ -13,42 +13,31 @@ jobs:
         $password = "runnerad3min$"
         $securePassword = ConvertTo-SecureString -String $password -AsPlainText -Force
         Set-LocalUser -Name "runneradmin" -Password $securePassword
-        
-        # Enable RDP
         Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -Value 0
-        
-        # Open firewall port for RDP
         Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
       shell: pwsh
 
     - name: Download and Configure ngrok
       run: |
         Invoke-WebRequest -Uri "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip" -OutFile "ngrok.zip"
-        Expand-Archive ngrok.zip
-        
-        # Authenticate ngrok using the secret
-        .\ngrok.exe config add-authtoken "${{ secrets.NGROK_THINGY }}"
+        Expand-Archive ngrok.zip -DestinationPath "ngrok_files"
+        .\ngrok_files\ngrok.exe config add-authtoken "${{ secrets.NGROK_THINGY }}"
       shell: pwsh
 
     - name: Start ngrok Tunnel and Display Address
       run: |
-        # Start ngrok as a background process
-        Start-Process -FilePath ".\ngrok.exe" -ArgumentList "tcp 3389 --log=stdout" -NoNewWindow -RedirectStandardOutput "ngrok.log"
-        
-        # Wait for ngrok to initialize and write its public URL to the log
+        Start-Process -FilePath ".\ngrok_files\ngrok.exe" -ArgumentList "tcp 3389 --log=stdout" -NoNewWindow -RedirectStandardOutput "ngrok.log"
         Start-Sleep -Seconds 5
-        
-        # Get the public URL from the log file
         $tunnelUrl = (Get-Content ngrok.log | Select-String -Pattern "url=tcp://(.+)" | ForEach-Object { $_.Matches[0].Groups[1].Value })
         
         if ($tunnelUrl) {
             Write-Host "--- RDP Connection Details ---"
             Write-Host "Address:  $tunnelUrl"
             Write-Host "Username: runneradmin"
-            Write-Host "Password: ok$"
+            Write-Host "Password: runnerad3min$"
             Write-Host "----------------------------"
         } else {
-            Write-Error "Could not retrieve ngrok tunnel URL. Check the log below."
+            Write-Error "Could not retrieve ngrok tunnel URL."
             Get-Content ngrok.log
             exit 1
         }
