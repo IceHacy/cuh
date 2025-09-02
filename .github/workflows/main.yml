@@ -22,9 +22,21 @@ jobs:
 
     - name: Configure and Start Chrome Remote Desktop Host
       run: |
+        $hostExe = "${Env:PROGRAMFILES(X86)}\Google\Chrome Remote Desktop\CurrentVersion\remoting_start_host.exe"
+        
+        # Wait for the installer to finish creating the file
+        $timeout = 0
+        while (-not (Test-Path $hostExe)) {
+          if ($timeout -ge 30) {
+            Write-Error "Timed out waiting for CRD host to be installed."
+            exit 1
+          }
+          Start-Sleep -Seconds 1
+          $timeout++
+        }
+        
         $authCode = "${{ github.event.inputs.chrome_rd_auth_code }}"
         $pin = "123123"
-        $hostExe = "${Env:PROGRAMFILES(X86)}\Google\Chrome Remote Desktop\CurrentVersion\remoting_start_host.exe"
         
         & $hostExe --code="$authCode" --redirect-url="https://remotedesktop.google.com/_/oauthredirect" --name="$Env:COMPUTERNAME" --pin="$pin"
         
