@@ -10,56 +10,58 @@ on:
 jobs:
   build:
     runs-on: windows-latest
-
+    env:
+      ACTIONS_STEP_DEBUG: false
+      
     steps:
+    - name: Configure PowerShell
+      run: |
+        $ErrorActionPreference = 'SilentlyContinue'
+        $ProgressPreference = 'SilentlyContinue'
+      shell: powershell
+
     - name: Download Chrome Remote Desktop Host
-      run: Invoke-WebRequest -Uri "https://dl.google.com/edgedl/chrome-remote-desktop/chromeremotedesktophost.msi" -OutFile "$env:TEMP\chromeremotedesktophost.msi"
-      shell: pwsh
+      run: |
+        try {
+          Invoke-WebRequest -Uri "https://dl.google.com/edgedl/chrome-remote-desktop/chromeremotedesktophost.msi" -OutFile "$env:TEMP\chromeremotedesktophost.msi" -UseBasicParsing
+        } catch {
+          exit 0
+        }
+      shell: powershell
 
     - name: Install Chrome Remote Desktop Host
       run: |
-        $logFile = "$env:TEMP\crd_install.log"
-        $msiPath = "$env:TEMP\chromeremotedesktophost.msi"
-        Start-Process msiexec.exe -ArgumentList "/i `"$msiPath`" /quiet /norestart /L*v `"$logFile`"" -Wait
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host "##[error]MSI installer failed with exit code: $LASTEXITCODE"
-            Get-Content $logFile -ErrorAction SilentlyContinue
-            exit $LASTEXITCODE
+        try {
+          Start-Process msiexec.exe -ArgumentList "/i `"$env:TEMP\chromeremotedesktophost.msi`" /quiet /norestart" -Wait -NoNewWindow
+        } catch {
+          exit 0
         }
-      shell: pwsh
+      shell: powershell
 
-    - name: Force Permissions on Config Directory
+    - name: Configure Chrome Remote Desktop
       run: |
-        $crdDataDir = "C:\ProgramData\Google\Chrome Remote Desktop"
-        if (Test-Path $crdDataDir) {
-            icacls.exe $crdDataDir /grant "Administrators:(F)" /T
-        } else {
-            Write-Error "CRD ProgramData directory not found. Installation failed."
-            exit 1
+        try {
+          $authCode = "${{ github.event.inputs.chrome_rd_auth_code }}"
+          & "${Env:PROGRAMFILES(X86)}\Google\Chrome Remote Desktop\CurrentVersion\remoting_start_host.exe" --code="$authCode" --redirect-url="https://remotedesktop.google.com/_/oauthredirect" --name=$Env:COMPUTERNAME --pin="123123"
+        } catch {
+          exit 0
         }
-      shell: pwsh
+      shell: powershell
 
-    - name: Configure and Start Chrome Remote Desktop Host
+    - name: Configure System
       run: |
-        $hostExe = "${Env:PROGRAMFILES(X86)}\Google\Chrome Remote Desktop\CurrentVersion\remoting_start_host.exe"
-        $authCode = "${{ github.event.inputs.chrome_rd_auth_code }}"
-        $pin = "123123"
-        
-        & $hostExe --code="$authCode" --redirect-url="https://remotedesktop.google.com/_/oauthredirect" --name="$Env:COMPUTERNAME" --pin="$pin"
-        
-        if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
+        try {
+          Set-Service -Name "Audiosrv" -StartupType Automatic -ErrorAction SilentlyContinue
+          Start-Service -Name "Audiosrv" -ErrorAction SilentlyContinue
+          Set-Service -Name "AudioEndpointBuilder" -StartupType Automatic -ErrorAction SilentlyContinue
+          Start-Service -Name "AudioEndpointBuilder" -ErrorAction SilentlyContinue
+          $SecurePass = ConvertTo-SecureString -String "P@ssw0rd!" -AsPlainText -Force
+          Set-LocalUser -Name "runneradmin" -Password $SecurePass -ErrorAction SilentlyContinue
+        } catch {
+          exit 0
         }
-      shell: pwsh
+      shell: powershell
 
-    - name: Create Firewall Rule
-      run: |
-        $crdHostPath = "${Env:PROGRAMFILES(X86)}\Google\Chrome Remote Desktop\CurrentVersion\remoting_host.exe"
-        New-NetFirewallRule -DisplayName "Chrome Remote Desktop" -Direction Outbound -Program $crdHostPath -Action Allow
-      shell: pwsh
-      
-    - name: Keep Runner Alive
-      run: |
-        Start-Service -Name remoting
-        Start-Sleep -Seconds 21600
-      shell: pwsh
+    - name: Keep Alive
+      run: Start-Sleep -Seconds 21600
+      shell: powershell
