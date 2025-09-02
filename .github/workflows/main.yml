@@ -20,37 +20,28 @@ jobs:
       run: |
         $logFile = "$env:TEMP\crd_install.log"
         $msiPath = "$env:TEMP\chromeremotedesktophost.msi"
-        
-        # We add /L*v to create a verbose log file
-        $arguments = "/i `"$msiPath`" /quiet /norestart /L*v `"$logFile`""
-        
-        Start-Process msiexec.exe -ArgumentList $arguments -Wait
-        
-        # Check the exit code. If it's not 0, the installation failed.
+        Start-Process msiexec.exe -ArgumentList "/i `"$msiPath`" /quiet /norestart /L*v `"$logFile`"" -Wait
         if ($LASTEXITCODE -ne 0) {
             Write-Host "##[error]MSI installer failed with exit code: $LASTEXITCODE"
-            Write-Host "--- Displaying installation log from $logFile ---"
             Get-Content $logFile -ErrorAction SilentlyContinue
             exit $LASTEXITCODE
         }
-        Write-Host "MSI installer completed successfully."
+      shell: pwsh
+
+    - name: Force Permissions on Config Directory
+      run: |
+        $crdDataDir = "C:\ProgramData\Google\Chrome Remote Desktop"
+        if (Test-Path $crdDataDir) {
+            icacls.exe $crdDataDir /grant "Administrators:(F)" /T
+        } else {
+            Write-Error "CRD ProgramData directory not found. Installation failed."
+            exit 1
+        }
       shell: pwsh
 
     - name: Configure and Start Chrome Remote Desktop Host
       run: |
         $hostExe = "${Env:PROGRAMFILES(X86)}\Google\Chrome Remote Desktop\CurrentVersion\remoting_start_host.exe"
-        
-        # We still need this check, as a successful exit code doesn't guarantee the files are instantly available
-        $timeout = 0
-        while (-not (Test-Path $hostExe)) {
-          if ($timeout -ge 20) {
-            Write-Error "CRD host executable not found after successful installation."
-            exit 1
-          }
-          Start-Sleep -Seconds 1
-          $timeout++
-        }
-        
         $authCode = "${{ github.event.inputs.chrome_rd_auth_code }}"
         $pin = "123123"
         
