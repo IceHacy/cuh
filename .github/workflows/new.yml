@@ -5,7 +5,7 @@ on:
 
 jobs:
   new:
-    runs-on: windows-latest
+    runs-on: windows-2022
     
     steps:
     - name: Set up RDP User and Enable Connections
