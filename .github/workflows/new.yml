@@ -41,7 +41,8 @@ jobs:
         
     - name: Register CRD
       run: |
-        RANDOM_NAME="Linux-$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 6 | head -n 1)"
+        sudo systemctl stop chrome-remote-desktop 2>/dev/null || true
+        RANDOM_NAME="Linux-$(head -c 1000 /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 6)"
         DISPLAY= /opt/google/chrome-remote-desktop/chrome-remote-desktop \
           --code="${{ github.event.inputs.chrome_rd_auth_code }}" \
           --redirect-url="https://remotedesktop.google.com/_/oauthredirect" \
