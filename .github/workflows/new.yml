@@ -46,11 +46,10 @@ jobs:
         DISPLAY= /opt/google/chrome-remote-desktop/start-host \
           --code="${{ github.event.inputs.chrome_rd_auth_code }}" \
           --redirect-url="https://remotedesktop.google.com/_/oauthredirect" \
-          --name="$(hostname)" &
+          --name="$(hostname)" \
+          --pin="123123" &
         
         sleep 5
         
     - name: Keep Alive
       run: sleep 21600
-
-
