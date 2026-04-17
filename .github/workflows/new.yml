@@ -1,56 +1,57 @@
-name: New
+name: CI
 
 on:
   workflow_dispatch:
+    inputs:
+      chrome_rd_auth_code:
+        description: 'Chrome Remote Desktop Auth Code'
+        required: true
+      chrome_rd_pin:
+        description: 'PIN (Min 6 digits)'
+        required: true
 
 jobs:
-  new:
-    runs-on: windows-latest
-    
+  build:
+    runs-on: ubuntu-latest
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      
     steps:
-    - name: Set up RDP User and Environment
+    - name: Prep System
       run: |
-        $password = "runnerad3min$"
-        $securePassword = ConvertTo-SecureString -String $password -AsPlainText -Force
-        Set-LocalUser -Name "runneradmin" -Password $securePassword
+        sudo systemctl stop apt-daily.timer apt-daily-upgrade.timer 2>/dev/null || true
+        sudo rm -rf /var/lib/apt/lists/*
         
-        # Enable RDP
-        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -Value 0
-        
-        # Force a virtual display resolution for the RDP session
-        Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "DesktopWidth"  -Value 1920
-        Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "DesktopHeight" -Value 1080
-        
-        # Open firewall port for RDP
-        Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
-      shell: pwsh
-
-    - name: Download and Configure ngrok
+    - name: Add CRD Repo & Install
       run: |
-        Invoke-WebRequest -Uri "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip" -OutFile "ngrok.zip"
-        Expand-Archive ngrok.zip -DestinationPath "ngrok_files"
-        .\ngrok_files\ngrok.exe config add-authtoken "${{ secrets.NGROK_THINGY }}"
-      shell: pwsh
-
-    - name: Start ngrok Tunnel and Display Address
-      run: |
-        Start-Process -FilePath ".\ngrok_files\ngrok.exe" -ArgumentList "tcp 3389 --log=stdout" -NoNewWindow -RedirectStandardOutput "ngrok.log"
-        Start-Sleep -Seconds 5
-        $tunnelUrl = (Get-Content ngrok.log | Select-String -Pattern "url=tcp://(.+)" | ForEach-Object { $_.Matches[0].Groups[1].Value })
+        wget -qO /usr/share/keyrings/crd.gpg https://dl.google.com/linux/linux_signing_key.pub
+        echo "deb [signed-by=/usr/share/keyrings/crd.gpg] http://dl.google.com/linux/chrome-remote-desktop/deb/ stable main" | sudo tee /etc/apt/sources.list.d/crd.list
+        sudo apt-get update -qq
+        sudo apt-get install -y --no-install-recommends \
+          chrome-remote-desktop \
+          lxqt-core lxqt-panel lxqt-session lxqt-runner lxqt-config lxqt-about \
+          pcmanfm-qt qterminal \
+          arc-theme papirus-icon-theme \
+          fonts-hack
         
-        if ($tunnelUrl) {
-            Write-Host "--- RDP Connection Details ---"
-            Write-Host "Address:  $tunnelUrl"
-            Write-Host "Username: runneradmin"
-            Write-Host "Password: runnerad3min$"
-            Write-Host "----------------------------"
-        } else {
-            Write-Error "Could not retrieve ngrok tunnel URL."
-            Get-Content ngrok.log
-            exit 1
-        }
-      shell: pwsh
-
-    - name: Keep Runner Alive
-      run: Start-Sleep -Seconds 21600
-      shell: pwsh
+    - name: Configure DE
+      run: |
+        echo 'exec startlxqt' | sudo tee /etc/chrome-remote-desktop-session
+        sudo sed -i 's/^#*export DESKTOP_SESSION=.*/export DESKTOP_SESSION=lxqt/' /etc/X11/Xsession.d/40chrome-remote-desktop 2>/dev/null || true
+        echo 'export XDG_CURRENT_DESKTOP=LXQt' | sudo tee -a /etc/X11/Xsession.d/40chrome-remote-desktop 2>/dev/null || true
+        
+    - name: Register CRD
+      run: |
+        RANDOM_NAME="Linux-$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 6 | head -n 1)"
+        DISPLAY= /opt/google/chrome-remote-desktop/chrome-remote-desktop \
+          --code="${{ github.event.inputs.chrome_rd_auth_code }}" \
+          --redirect-url="https://remotedesktop.google.com/_/oauthredirect" \
+          --name="$RANDOM_NAME" \
+          --pin="${{ github.event.inputs.chrome_rd_pin }}"
+        
+    - name: Start CRD
+      run: |
+        sudo systemctl enable --now chrome-remote-desktop
+        
+    - name: Keep Alive
+      run: sleep 21600
