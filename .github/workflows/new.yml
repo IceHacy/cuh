@@ -27,7 +27,6 @@ jobs:
           chrome-remote-desktop \
           xfce4-session xfce4-panel xfce4-settings xfce4-terminal \
           xfdesktop4 xfwm4 \
-          firefox \
           fonts-liberation
         
     - name: Configure DE
