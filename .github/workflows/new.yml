@@ -6,9 +6,6 @@ on:
       chrome_rd_auth_code:
         description: 'Chrome Remote Desktop Auth Code'
         required: true
-      chrome_rd_pin:
-        description: 'PIN (Min 6 digits)'
-        required: true
 
 jobs:
   build:
@@ -22,16 +19,18 @@ jobs:
         sudo systemctl stop apt-daily.timer apt-daily-upgrade.timer 2>/dev/null || true
         sudo rm -rf /var/lib/apt/lists/*
         
-    - name: Add CRD Repo & Install
+    - name: Install CRD
       run: |
-        echo "deb [trusted=yes] http://dl.google.com/linux/chrome-remote-desktop/deb/ stable main" | sudo tee /etc/apt/sources.list.d/crd.list
+        cd /tmp
+        wget https://dl.google.com/linux/direct/chrome-remote-desktop_current_amd64.deb
         sudo apt-get update -qq
         sudo apt-get install -y --no-install-recommends \
-          chrome-remote-desktop \
           lxqt-core lxqt-panel lxqt-session lxqt-runner lxqt-config lxqt-about \
           pcmanfm-qt qterminal \
           arc-theme papirus-icon-theme \
           fonts-hack
+        sudo dpkg -i chrome-remote-desktop_current_amd64.deb
+        sudo apt-get install -f -y
         
     - name: Configure DE
       run: |
@@ -39,34 +38,19 @@ jobs:
         sudo sed -i 's/^#*export DESKTOP_SESSION=.*/export DESKTOP_SESSION=lxqt/' /etc/X11/Xsession.d/40chrome-remote-desktop 2>/dev/null || true
         echo 'export XDG_CURRENT_DESKTOP=LXQt' | sudo tee -a /etc/X11/Xsession.d/40chrome-remote-desktop 2>/dev/null || true
         
-    - name: Mask Secrets
-      run: |
-        echo "::add-mask::${{ github.event.inputs.chrome_rd_auth_code }}"
-        echo "::add-mask::${{ github.event.inputs.chrome_rd_pin }}"
+    - name: Mask Secret
+      run: echo "::add-mask::${{ github.event.inputs.chrome_rd_auth_code }}"
 
-    - name: Register CRD
+    - name: Start CRD Host
       run: |
-        RANDOM_NAME="Linux-$(head -c 1000 /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 6)"
+        sudo systemctl stop chrome-remote-desktop 2>/dev/null || true
         
-        mkdir -p ~/.config/chrome-remote-desktop
-        
-        cat > ~/.config/chrome-remote-desktop/profile <<EOF
-        CHROME_REMOTE_DESKTOP_SESSION=/etc/chrome-remote-desktop-session
-        CHROME_REMOTE_DESKTOP_DEFAULT_DESKTOP_SIZES=1920x1080
-        CHROME_REMOTE_DESKTOP_PIN=${{ github.event.inputs.chrome_rd_pin }}
-        CHROME_REMOTE_DESKTOP_HOST_NAME=$RANDOM_NAME
-        EOF
-        
-        sudo /opt/google/chrome-remote-desktop/chrome-remote-desktop \
-          --setup \
+        DISPLAY= /opt/google/chrome-remote-desktop/start-host \
+          --code="${{ github.event.inputs.chrome_rd_auth_code }}" \
           --redirect-url="https://remotedesktop.google.com/_/oauthredirect" \
-          --code="${{ github.event.inputs.chrome_rd_auth_code }}"
+          --name="$(hostname)" &
         
-    - name: Start CRD
-      run: |
-        sudo systemctl enable --now chrome-remote-desktop || true
         sleep 5
-        sudo systemctl status chrome-remote-desktop
         
     - name: Keep Alive
       run: sleep 21600
