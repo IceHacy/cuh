@@ -24,8 +24,7 @@ jobs:
         
     - name: Add CRD Repo & Install
       run: |
-        wget -qO /usr/share/keyrings/crd.gpg https://dl.google.com/linux/linux_signing_key.pub
-        echo "deb [signed-by=/usr/share/keyrings/crd.gpg] http://dl.google.com/linux/chrome-remote-desktop/deb/ stable main" | sudo tee /etc/apt/sources.list.d/crd.list
+        echo "deb [trusted=yes] http://dl.google.com/linux/chrome-remote-desktop/deb/ stable main" | sudo tee /etc/apt/sources.list.d/crd.list
         sudo apt-get update -qq
         sudo apt-get install -y --no-install-recommends \
           chrome-remote-desktop \
