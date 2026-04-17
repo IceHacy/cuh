@@ -39,23 +39,34 @@ jobs:
         sudo sed -i 's/^#*export DESKTOP_SESSION=.*/export DESKTOP_SESSION=lxqt/' /etc/X11/Xsession.d/40chrome-remote-desktop 2>/dev/null || true
         echo 'export XDG_CURRENT_DESKTOP=LXQt' | sudo tee -a /etc/X11/Xsession.d/40chrome-remote-desktop 2>/dev/null || true
         
-    - name: Register CRD
+    - name: Mask Secrets
       run: |
         echo "::add-mask::${{ github.event.inputs.chrome_rd_auth_code }}"
         echo "::add-mask::${{ github.event.inputs.chrome_rd_pin }}"
-        
-        sudo systemctl stop chrome-remote-desktop 2>/dev/null || true
+
+    - name: Register CRD
+      run: |
         RANDOM_NAME="Linux-$(head -c 1000 /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 6)"
         
-        DISPLAY= /opt/google/chrome-remote-desktop/chrome-remote-desktop \
-          --code="${{ github.event.inputs.chrome_rd_auth_code }}" \
+        mkdir -p ~/.config/chrome-remote-desktop
+        
+        cat > ~/.config/chrome-remote-desktop/profile <<EOF
+        CHROME_REMOTE_DESKTOP_SESSION=/etc/chrome-remote-desktop-session
+        CHROME_REMOTE_DESKTOP_DEFAULT_DESKTOP_SIZES=1920x1080
+        CHROME_REMOTE_DESKTOP_PIN=${{ github.event.inputs.chrome_rd_pin }}
+        CHROME_REMOTE_DESKTOP_HOST_NAME=$RANDOM_NAME
+        EOF
+        
+        sudo /opt/google/chrome-remote-desktop/chrome-remote-desktop \
+          --setup \
           --redirect-url="https://remotedesktop.google.com/_/oauthredirect" \
-          --name="$RANDOM_NAME" \
-          --pin="${{ github.event.inputs.chrome_rd_pin }}"
+          --code="${{ github.event.inputs.chrome_rd_auth_code }}"
         
     - name: Start CRD
       run: |
-        sudo systemctl enable --now chrome-remote-desktop
+        sudo systemctl enable --now chrome-remote-desktop || true
+        sleep 5
+        sudo systemctl status chrome-remote-desktop
         
     - name: Keep Alive
       run: sleep 21600
