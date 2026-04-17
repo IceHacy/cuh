@@ -25,16 +25,15 @@ jobs:
         sudo apt-get update -qq
         sudo apt-get install -y --no-install-recommends \
           chrome-remote-desktop \
-          lxqt-core lxqt-panel lxqt-session lxqt-runner lxqt-config lxqt-about \
-          pcmanfm-qt qterminal \
-          arc-theme papirus-icon-theme \
-          fonts-hack
+          openbox obconf \
+          xterm xdg-utils \
+          fonts-liberation
         
     - name: Configure DE
       run: |
-        echo 'exec startlxqt' | sudo tee /etc/chrome-remote-desktop-session
-        sudo sed -i 's/^#*export DESKTOP_SESSION=.*/export DESKTOP_SESSION=lxqt/' /etc/X11/Xsession.d/40chrome-remote-desktop 2>/dev/null || true
-        echo 'export XDG_CURRENT_DESKTOP=LXQt' | sudo tee -a /etc/X11/Xsession.d/40chrome-remote-desktop 2>/dev/null || true
+        echo 'exec openbox' | sudo tee /etc/chrome-remote-desktop-session
+        sudo sed -i 's/^#*export DESKTOP_SESSION=.*/export DESKTOP_SESSION=openbox/' /etc/X11/Xsession.d/40chrome-remote-desktop 2>/dev/null || true
+        echo 'export XDG_CURRENT_DESKTOP=Openbox' | sudo tee -a /etc/X11/Xsession.d/40chrome-remote-desktop 2>/dev/null || true
         
     - name: Mask Secret
       run: echo "::add-mask::${{ github.event.inputs.chrome_rd_auth_code }}"
