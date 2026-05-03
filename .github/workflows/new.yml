@@ -2,53 +2,29 @@ name: CI
 
 on:
   workflow_dispatch:
-    inputs:
-      chrome_rd_auth_code:
-        description: 'Chrome Remote Desktop Auth Code'
-        required: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      DEBIAN_FRONTEND: noninteractive
-      
-    steps:
-    - name: Prep System
-      run: |
-        sudo systemctl stop apt-daily.timer apt-daily-upgrade.timer 2>/dev/null || true
-        sudo rm -rf /var/lib/apt/lists/*
-        
-    - name: Install CRD
-      run: |
-        echo "deb [trusted=yes] http://dl.google.com/linux/chrome-remote-desktop/deb/ stable main" | sudo tee /etc/apt/sources.list.d/crd.list
-        sudo apt-get update -qq
-        sudo apt-get install -y --no-install-recommends \
-          chrome-remote-desktop \
-          xfce4-session xfce4-panel xfce4-settings xfce4-terminal \
-          xfdesktop4 xfwm4 \
-          fonts-liberation
-        
-    - name: Configure DE
-      run: |
-        echo 'exec startxfce4' | sudo tee /etc/chrome-remote-desktop-session
-        sudo sed -i 's/^#*export DESKTOP_SESSION=.*/export DESKTOP_SESSION=xfce/' /etc/X11/Xsession.d/40chrome-remote-desktop 2>/dev/null || true
-        echo 'export XDG_CURRENT_DESKTOP=XFCE' | sudo tee -a /etc/X11/Xsession.d/40chrome-remote-desktop 2>/dev/null || true
-        
-    - name: Mask Secret
-      run: echo "::add-mask::${{ github.event.inputs.chrome_rd_auth_code }}"
 
-    - name: Start CRD Host
+    steps:
+    - name: Setup
       run: |
-        sudo systemctl stop chrome-remote-desktop 2>/dev/null || true
-        
-        DISPLAY= /opt/google/chrome-remote-desktop/start-host \
-          --code="${{ github.event.inputs.chrome_rd_auth_code }}" \
-          --redirect-url="https://remotedesktop.google.com/_/oauthredirect" \
-          --name="$(hostname)" \
-          --pin="123123" &
-        
-        sleep 5
-        
-    - name: Keep Alive
+        curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.noarmor.gpg \
+          | sudo tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null
+        curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.tailscale-keyring.list \
+          | sudo tee /etc/apt/sources.list.d/tailscale.list
+        sudo apt-get update -qq
+        sudo apt-get install -y tailscale
+        sudo tailscaled &
+        sleep 2
+
+    - name: Authing
+      env:
+        TS_AUTHKEY: ${{ secrets.ts_auth }}
+      run: |
+        sudo tailscale up --authkey="$TS_AUTHKEY" --hostname="gh-runner-${{ github.run_id }}"
+        tailscale status
+
+    - name: Sleep
       run: sleep 21600
