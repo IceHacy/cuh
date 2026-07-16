@@ -10,23 +10,15 @@ jobs:
     steps:
     - name: Setup
       run: |
-        REDIRECT_URL=$(curl -s -o /dev/null -w "%{redirect_url}" https://github.com/tailscale/tailscale/releases/latest)
-        LATEST_TAG=$(grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' <<< "$REDIRECT_URL")
-        VERSION=${LATEST_TAG#v}
-        
-        curl -fsSL "https://github.com/tailscale/tailscale/releases/download/${LATEST_TAG}/tailscale_${VERSION}_amd64.tgz" -o tailscale.tgz
-        tar -xzf tailscale.tgz
-        
-        sudo cp tailscale_${VERSION}_amd64/tailscaled /usr/sbin/tailscaled
-        sudo cp tailscale_${VERSION}_amd64/tailscale /usr/bin/tailscale
-        sudo chmod +x /usr/sbin/tailscaled /usr/bin/tailscale
-        
-        sudo mkdir -p /var/lib/tailscale /run/tailscale
-
-        printf 'net.ipv4.ip_forward = 1\n' | sudo tee -a /etc/sysctl.conf > /dev/null
-        printf 'net.ipv6.conf.all.forwarding = 1\n' | sudo tee -a /etc/sysctl.conf > /dev/null
-        sudo sysctl -p > /dev/null
-
+        curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.noarmor.gpg \
+          | sudo tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null
+        curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.tailscale-keyring.list \
+          | sudo tee /etc/apt/sources.list.d/tailscale.list
+        sudo apt-get update -qq
+        sudo apt-get install -y tailscale
+        echo 'net.ipv4.ip_forward = 1' | sudo tee -a /etc/sysctl.conf
+        echo 'net.ipv6.conf.all.forwarding = 1' | sudo tee -a /etc/sysctl.conf
+        sudo sysctl -p
         sudo tailscaled &
         sleep 2
 
