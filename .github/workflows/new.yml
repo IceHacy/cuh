@@ -10,15 +10,15 @@ jobs:
     steps:
     - name: Setup
       run: |
-        curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.noarmor.gpg \
-          | sudo tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null
-        curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.tailscale-keyring.list \
-          | sudo tee /etc/apt/sources.list.d/tailscale.list
+        curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.noarmor.gpg | sudo tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null
+        curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.tailscale-keyring.list | sudo tee /etc/apt/sources.list.d/tailscale.list
         sudo apt-get update -qq
-        sudo apt-get install -y tailscale
+        sudo apt-get install -y tailscale ethtool
         echo 'net.ipv4.ip_forward = 1' | sudo tee -a /etc/sysctl.conf
         echo 'net.ipv6.conf.all.forwarding = 1' | sudo tee -a /etc/sysctl.conf
         sudo sysctl -p
+        DEFAULT_INTERFACE=$(ip -o route get 8.8.8.8 | cut -f 5 -d " ")
+        sudo ethtool -K $DEFAULT_INTERFACE rx-udp-gro-forwarding on rx-gro-list off || true
         sudo tailscaled &
         sleep 2
 
@@ -26,8 +26,10 @@ jobs:
       env:
         TS_AUTHKEY: ${{ secrets.ts_auth }}
       run: |
-        sudo tailscale up --authkey="$TS_AUTHKEY" --advertise-exit-node --hostname="gh-runner-${{ github.run_id }}"
-        tailscale status
+        sudo tailscale up --authkey="$TS_AUTHKEY" --advertise-exit-node --hostname="gh-runner-${{ github.run_id }}" --reset
+        sleep 5
+        sudo tailscale netcheck
+        sudo tailscale status
 
     - name: Sleep
       run: sleep 21600
